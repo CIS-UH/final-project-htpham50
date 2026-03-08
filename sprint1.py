@@ -161,3 +161,153 @@ def delete_member(member_id):
     mysql.connection.commit()
     cur.close()
     return jsonify({'message': 'Member deleted'}), 200
+
+#EVENT ENDPOINTS SECTION 
+
+#Showcases getting all events
+@app.route('/events', methods=['GET'])
+def get_events():
+    """Return all events."""
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM event")
+    events = cur.fetchall()
+    cur.close()
+    return jsonify(events), 200
+
+
+
+#Showcases returning a single event by ID with error handling for not found
+@app.route('/events/<int:event_id>', methods=['GET'])
+def get_event(event_id):
+    """Return a single event by ID."""
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM event WHERE id = %s", (event_id,))
+    event = cur.fetchone()
+    cur.close()
+    if not event:
+        return error('Event not found', 404)
+    return jsonify(event), 200
+
+
+
+#Showcases creating an event with validation and error handling for bad input and business rule of unique date
+@app.route('/events', methods=['POST'])
+def create_event():
+    """Create a new event.
+
+
+    Body (JSON):
+        name      (str,  required)
+        capacity  (int,  required)
+        level     (str,  required) – Bronze | Silver | Gold
+        date      (str,  required) – YYYY-MM-DD
+    """
+    data = request.get_json()
+    if not data:
+        return error('Request body must be JSON')
+
+
+    name     = data.get('name', '').strip()
+    capacity = data.get('capacity')
+    level    = data.get('level', '').strip()
+    date     = data.get('date', '').strip()
+
+
+    if not name:
+        return error('name is required')
+    if capacity is None or not str(capacity).isdigit() or int(capacity) <= 0:
+        return error('capacity must be a positive integer')
+    if level not in LEVELS:
+        return error(f'level must be one of {LEVELS}')
+    if not date:
+        return error('date is required (YYYY-MM-DD)')
+
+
+    cur = mysql.connection.cursor()
+
+
+    # Business rule: no two events on the same date 
+    cur.execute("SELECT id FROM event WHERE date = %s", (date,))
+    if cur.fetchone():
+        cur.close()
+        return error('An event already exists on this date'), 409
+
+
+    cur.execute(
+        "INSERT INTO event (name, capacity, level, date) VALUES (%s, %s, %s, %s)",
+        (name, int(capacity), level, date)
+    )
+    mysql.connection.commit()
+    new_id = cur.lastrowid
+    cur.close()
+    return jsonify({'message': 'Event created', 'id': new_id}), 201
+
+
+
+#Showcases updating an existing event with full or partial update, validation, and business rule of unique date (excluding self)
+@app.route('/events/<int:event_id>', methods=['PUT'])
+def update_event(event_id):
+    """Update an existing event (full or partial update)."""
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM event WHERE id = %s", (event_id,))
+    event = cur.fetchone()
+    if not event:
+        cur.close()
+        return error('Event not found', 404)
+
+
+    data = request.get_json()
+    if not data:
+        cur.close()
+        return error('Request body must be JSON')
+
+
+    name     = data.get('name',     event['name']).strip()
+    capacity = data.get('capacity', event['capacity'])
+    level    = data.get('level',    event['level']).strip()
+    date     = data.get('date',     str(event['date'])).strip()
+
+
+    if not name:
+        cur.close()
+        return error('name cannot be empty')
+    if not str(capacity).isdigit() or int(capacity) <= 0:
+        cur.close()
+        return error('capacity must be a positive integer')
+    if level not in LEVELS:
+        cur.close()
+        return error(f'level must be one of {LEVELS}')
+
+
+    # Business rule: unique date (exclude current event)
+    cur.execute("SELECT id FROM event WHERE date = %s AND id != %s", (date, event_id))
+    if cur.fetchone():
+        cur.close()
+        return error('Another event already exists on this date'), 409
+
+
+    cur.execute(
+        "UPDATE event SET name=%s, capacity=%s, level=%s, date=%s WHERE id=%s",
+        (name, int(capacity), level, date, event_id)
+    )
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': 'Event updated'}), 200
+
+
+
+#Showcases deleting an event with error handling for not found and cascading delete of registrations
+@app.route('/events/<int:event_id>', methods=['DELETE'])
+def delete_event(event_id):
+    """Delete an event (cascades to registrations)."""
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id FROM event WHERE id = %s", (event_id,))
+    if not cur.fetchone():
+        cur.close()
+        return error('Event not found', 404)
+
+
+    cur.execute("DELETE FROM event WHERE id = %s", (event_id,))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': 'Event deleted'}), 200

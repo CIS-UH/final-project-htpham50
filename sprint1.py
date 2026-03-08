@@ -311,3 +311,260 @@ def delete_event(event_id):
     mysql.connection.commit()
     cur.close()
     return jsonify({'message': 'Event deleted'}), 200
+
+#  REGISTRATION ENDPOINTS SECTION
+
+#Showcases getting all registrations with joined member and event names for easier frontend display
+@app.route('/registrations', methods=['GET'])
+def get_registrations():
+    """Return all registrations (with joined member & event names)."""
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT r.id, r.event_id, r.member_id,
+               e.name AS event_name, m.name AS member_name
+        FROM registration r
+        JOIN event  e ON r.event_id  = e.id
+        JOIN member m ON r.member_id = m.id
+    """)
+    registrations = cur.fetchall()
+    cur.close()
+    return jsonify(registrations), 200
+
+
+
+#Showcases returning a single registration by ID with joined member and event names and error handling for not found
+@app.route('/registrations/<int:reg_id>', methods=['GET'])
+def get_registration(reg_id):
+    """Return a single registration by ID."""
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT r.id, r.event_id, r.member_id,
+               e.name AS event_name, m.name AS member_name
+        FROM registration r
+        JOIN event  e ON r.event_id  = e.id
+        JOIN member m ON r.member_id = m.id
+        WHERE r.id = %s
+    """, (reg_id,))
+    reg = cur.fetchone()
+    cur.close()
+    if not reg:
+        return error('Registration not found', 404)
+    return jsonify(reg), 200
+
+
+
+#Showcases returning all members registered for a specific event with error handling for event not found
+@app.route('/events/<int:event_id>/members', methods=['GET'])
+def get_members_for_event(event_id):
+    """Return all members registered for a specific event."""
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id FROM event WHERE id = %s", (event_id,))
+    if not cur.fetchone():
+        cur.close()
+        return error('Event not found', 404)
+
+
+    cur.execute("""
+        SELECT m.id, m.name, m.title, m.level
+        FROM member m
+        JOIN registration r ON r.member_id = m.id
+        WHERE r.event_id = %s
+    """, (event_id,))
+    members = cur.fetchall()
+    cur.close()
+    return jsonify(members), 200
+
+
+
+#Showcases registering a member to an event with validation and error handling for bad input and business rules
+#Shows business rules of member level must be >= event level, event must not be at capacity, and member cannot register for same event twice
+@app.route('/registrations', methods=['POST'])
+def create_registration():
+    """Register a member to an event.
+
+
+    Body (JSON):
+        event_id   (int, required)
+        member_id  (int, required)
+
+
+    Business rules enforced:
+        1. Member level must be >= event level.
+        2. Event must not be at capacity.
+        3. Member cannot register for the same event twice.
+    """
+    data = request.get_json()
+    if not data:
+        return error('Request body must be JSON')
+
+
+    event_id  = data.get('event_id')
+    member_id = data.get('member_id')
+
+
+    if event_id is None or member_id is None:
+        return error('event_id and member_id are required')
+
+
+    cur = mysql.connection.cursor()
+
+
+    # Fetch event
+    cur.execute("SELECT * FROM event WHERE id = %s", (event_id,))
+    event = cur.fetchone()
+    if not event:
+        cur.close()
+        return error('Event not found', 404)
+
+
+    # Fetch member
+    cur.execute("SELECT * FROM member WHERE id = %s", (member_id,))
+    member = cur.fetchone()
+    if not member:
+        cur.close()
+        return error('Member not found', 404)
+
+
+    # Business rule 1: level check
+    if LEVEL_RANK[member['level']] < LEVEL_RANK[event['level']]:
+        cur.close()
+        return error(
+            f"Member level '{member['level']}' is insufficient for a "
+            f"'{event['level']}' event"
+        ), 403
+
+
+    # Business rule 2: capacity check
+    cur.execute(
+        "SELECT COUNT(*) AS cnt FROM registration WHERE event_id = %s",
+        (event_id,)
+    )
+    count = cur.fetchone()['cnt']
+    if count >= event['capacity']:
+        cur.close()
+        return error('Event is at full capacity'), 409
+
+
+    # Business rule 3: duplicate registration
+    cur.execute(
+        "SELECT id FROM registration WHERE event_id = %s AND member_id = %s",
+        (event_id, member_id)
+    )
+    if cur.fetchone():
+        cur.close()
+        return error('Member is already registered for this event'), 409
+
+
+    cur.execute(
+        "INSERT INTO registration (event_id, member_id) VALUES (%s, %s)",
+        (event_id, member_id)
+    )
+    mysql.connection.commit()
+    new_id = cur.lastrowid
+    cur.close()
+    return jsonify({'message': 'Registration created', 'id': new_id}), 201
+
+
+
+#Showcases updating a registration to change the event and/or member with validation and error handling for bad input and business rules
+@app.route('/registrations/<int:reg_id>', methods=['PUT'])
+def update_registration(reg_id):
+    """Update a registration (change event and/or member).
+
+
+    Body (JSON):
+        event_id   (int, optional)
+        member_id  (int, optional)
+
+
+    The same business rules as POST apply.
+    """
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM registration WHERE id = %s", (reg_id,))
+    reg = cur.fetchone()
+    if not reg:
+        cur.close()
+        return error('Registration not found', 404)
+
+
+    data = request.get_json()
+    if not data:
+        cur.close()
+        return error('Request body must be JSON')
+
+
+    new_event_id  = data.get('event_id',  reg['event_id'])
+    new_member_id = data.get('member_id', reg['member_id'])
+
+
+    # Fetch event
+    cur.execute("SELECT * FROM event WHERE id = %s", (new_event_id,))
+    event = cur.fetchone()
+    if not event:
+        cur.close()
+        return error('Event not found', 404)
+
+
+    # Fetch member
+    cur.execute("SELECT * FROM member WHERE id = %s", (new_member_id,))
+    member = cur.fetchone()
+    if not member:
+        cur.close()
+        return error('Member not found', 404)
+
+
+    # Level check
+    if LEVEL_RANK[member['level']] < LEVEL_RANK[event['level']]:
+        cur.close()
+        return error(
+            f"Member level '{member['level']}' is insufficient for a "
+            f"'{event['level']}' event"
+        ), 403
+
+
+    # Capacity check (exclude current registration's event if same)
+    cur.execute(
+        "SELECT COUNT(*) AS cnt FROM registration WHERE event_id = %s AND id != %s",
+        (new_event_id, reg_id)
+    )
+    count = cur.fetchone()['cnt']
+    if count >= event['capacity']:
+        cur.close()
+        return error('Event is at full capacity'), 409
+
+
+    # Duplicate check (exclude self)
+    cur.execute(
+        "SELECT id FROM registration WHERE event_id=%s AND member_id=%s AND id != %s",
+        (new_event_id, new_member_id, reg_id)
+    )
+    if cur.fetchone():
+        cur.close()
+        return error('Member is already registered for this event'), 409
+
+
+    cur.execute(
+        "UPDATE registration SET event_id=%s, member_id=%s WHERE id=%s",
+        (new_event_id, new_member_id, reg_id)
+    )
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': 'Registration updated'}), 200
+
+
+
+#Showcases deleting a registration with error handling for not found
+@app.route('/registrations/<int:reg_id>', methods=['DELETE'])
+def delete_registration(reg_id):
+    """Delete a registration."""
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT id FROM registration WHERE id = %s", (reg_id,))
+    if not cur.fetchone():
+        cur.close()
+        return error('Registration not found', 404)
+
+
+    cur.execute("DELETE FROM registration WHERE id = %s", (reg_id,))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': 'Registration deleted'}), 200

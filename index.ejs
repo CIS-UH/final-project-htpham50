@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization — Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<%- include('partials/nav', { page: 'home' }) %>
+
+<main>
+  <div class="hero">
+    <p class="hero-eyebrow">Member & Event Management</p>
+    <h1>Organization <em>Management</em><br>Control Panel</h1>
+    <p>Manage your exclusive membership tiers, curate events, and oversee every registration in one refined interface.</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="flash flash-error">⚠ <%= error %></div>
+  <% } %>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number"><%= memberCount %></div>
+      <div class="stat-label">Total Members</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number"><%= eventCount %></div>
+      <div class="stat-label">Scheduled Events</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number"><%= regCount %></div>
+      <div class="stat-label">Registrations</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.5rem;">
+    <a href="/members" class="panel" style="text-decoration:none;padding:1.5rem;display:block;transition:border-color 0.2s,transform 0.2s;" onmouseover="this.style.borderColor='var(--gold)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
+      <div style="font-size:1.5rem;margin-bottom:0.75rem;">👤</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--text);margin-bottom:0.4rem;">Members</div>
+      <div style="color:var(--text-muted);font-size:11px;">Create, view, edit, and remove members. Assign Bronze, Silver, or Gold tier.</div>
+    </a>
+    <a href="/events" class="panel" style="text-decoration:none;padding:1.5rem;display:block;transition:border-color 0.2s,transform 0.2s;" onmouseover="this.style.borderColor='var(--gold)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
+      <div style="font-size:1.5rem;margin-bottom:0.75rem;">📅</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--text);margin-bottom:0.4rem;">Events</div>
+      <div style="color:var(--text-muted);font-size:11px;">Schedule exclusive events with capacity limits and membership level requirements.</div>
+    </a>
+    <a href="/registrations" class="panel" style="text-decoration:none;padding:1.5rem;display:block;transition:border-color 0.2s,transform 0.2s;" onmouseover="this.style.borderColor='var(--gold)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--border)';this.style.transform=''">
+      <div style="font-size:1.5rem;margin-bottom:0.75rem;">📋</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.2rem;color:var(--text);margin-bottom:0.4rem;">Registrations</div>
+      <div style="color:var(--text-muted);font-size:11px;">Register members for events. Business rules enforced automatically.</div>
+    </a>
+  </div>
+</main>
+
+</body>
+</html>

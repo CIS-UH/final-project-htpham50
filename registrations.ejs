@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization — Registrations</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<%- include('partials/nav', { page: 'registrations' }) %>
+
+<main>
+  <div class="page-header">
+    <h1>Event <em>Registrations</em></h1>
+    <p class="page-subtitle">Register members for events — level, capacity & duplicate rules enforced</p>
+  </div>
+
+  <% if (flash) { %>
+    <div class="flash flash-success">✓ <%= flash %></div>
+  <% } %>
+  <% if (formError) { %>
+    <div class="flash flash-error">⚠ <%= formError %></div>
+  <% } %>
+
+  <div class="two-col">
+
+    <!-- CREATE FORM -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">New Registration</span>
+      </div>
+      <div class="panel-body">
+        <form action="/registrations/create" method="POST">
+          <div class="form-group">
+            <label for="event_id">Event *</label>
+            <select id="event_id" name="event_id" required>
+              <option value="">— Select an event —</option>
+              <% (events || []).forEach(function(ev) { %>
+                <option value="<%= ev.id %>"><%= ev.name %> (<%= ev.date ? ev.date.toString().substring(0,10) : '' %>) — <%= ev.level %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="member_id">Member *</label>
+            <select id="member_id" name="member_id" required>
+              <option value="">— Select a member —</option>
+              <% (members || []).forEach(function(m) { %>
+                <option value="<%= m.id %>"><%= m.name %> — <%= m.level %></option>
+              <% }); %>
+            </select>
+          </div>
+          <p style="color:var(--text-dim);font-size:10px;margin-bottom:1rem;line-height:1.6;">
+            Member level must meet or exceed the event's required level.<br>
+            Capacity and duplicate registrations are also enforced.
+          </p>
+          <button type="submit" class="btn btn-gold" style="width:100%;">+ Register Member</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- REGISTRATIONS TABLE -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">All Registrations</span>
+        <span style="color:var(--text-muted);font-size:11px;"><%= (registrations || []).length %> total</span>
+      </div>
+      <% if (!(registrations || []).length) { %>
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No registrations yet.</p>
+        </div>
+      <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Member</th>
+              <th>Event</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% (registrations || []).forEach(function(r) { %>
+            <tr>
+              <td><strong style="color:var(--text)"><%= r.member_name %></strong></td>
+              <td style="color:var(--text-muted)"><%= r.event_name %></td>
+              <td>
+                <div class="action-row">
+                  <button type="button" class="btn btn-edit" onclick='openEditReg(<%- JSON.stringify(r) %>)'>Edit</button>
+                  <form action="/registrations/delete" method="POST" onsubmit="return confirm('Remove this registration?');">
+                    <input type="hidden" name="id" value="<%= r.id %>">
+                    <button type="submit" class="btn btn-danger">Remove</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+
+  </div>
+</main>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Registration</span>
+      <button type="button" class="modal-close" onclick="closeModal('editModal')">✕</button>
+    </div>
+    <form action="/registrations/update" method="POST">
+      <input type="hidden" id="edit-id" name="id">
+      <div class="form-group">
+        <label>Event *</label>
+        <select id="edit-event" name="event_id" required>
+          <% (events || []).forEach(function(ev) { %>
+            <option value="<%= ev.id %>"><%= ev.name %> (<%= ev.date ? ev.date.toString().substring(0,10) : '' %>) — <%= ev.level %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Member *</label>
+        <select id="edit-member" name="member_id" required>
+          <% (members || []).forEach(function(m) { %>
+            <option value="<%= m.id %>"><%= m.name %> — <%= m.level %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const editModal = document.getElementById('editModal');
+function openEditReg(r) {
+  document.getElementById('edit-id').value = r.id || '';
+  document.getElementById('edit-event').value = r.event_id || '';
+  document.getElementById('edit-member').value = r.member_id || '';
+  editModal.classList.add('open');
+}
+function closeModal() {
+  editModal.classList.remove('open');
+}
+if (editModal) {
+  editModal.addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+}
+
+</script>
+
+</body>
+</html>

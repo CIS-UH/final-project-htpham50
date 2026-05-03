@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization — Event Roster</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<%- include('partials/nav', { page: 'event-members' }) %>
+
+<main>
+  <div class="page-header">
+    <h1>Event <em>Roster</em></h1>
+    <p class="page-subtitle">View all members registered for a specific event</p>
+  </div>
+
+  <!-- EVENT SELECTOR -->
+  <div class="event-filter panel" style="padding:1.2rem 1.5rem;margin-bottom:1.5rem;">
+    <form method="GET" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <label style="margin-bottom:0;">Select Event:</label>
+      <select name="dummy" style="width:auto;min-width:280px;" onchange="navigateToEvent(this)">
+        <option value="">— Choose an event —</option>
+        <% allEvents.forEach(function(ev) { %>
+          <option value="<%= ev.id %>" <%= selectedEventId === ev.id ? 'selected' : '' %>>
+            <%= ev.name %> (<%= ev.date ? ev.date.toString().substring(0,10) : '' %>) — <%= ev.level %>
+          </option>
+        <% }); %>
+      </select>
+    </form>
+  </div>
+
+  <% if (event && event.id) { %>
+
+  <!-- EVENT DETAILS -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <div class="panel" style="padding:1.2rem 1.5rem;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.4rem;">Event</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;"><%= event.name %></div>
+    </div>
+    <div class="panel" style="padding:1.2rem 1.5rem;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.4rem;">Date</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;"><%= event.date ? event.date.toString().substring(0,10) : '—' %></div>
+    </div>
+    <div class="panel" style="padding:1.2rem 1.5rem;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);margin-bottom:0.4rem;">Level / Capacity</div>
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <span class="badge badge-<%= event.level.toLowerCase() %>"><%= event.level %></span>
+          <span style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;"><%= members.length %> / <%= event.capacity %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEMBERS TABLE -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Registered Members</span>
+      <span style="color:var(--text-muted);font-size:11px;"><%= members.length %> registered</span>
+    </div>
+    <% if (members.length === 0) { %>
+      <div class="empty-state">
+        <div class="empty-icon">👤</div>
+        <p>No members registered for this event yet.</p>
+      </div>
+    <% } else { %>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Title</th>
+            <th>Membership Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% members.forEach(function(m) { %>
+          <tr>
+            <td><strong style="color:var(--text)"><%= m.name %></strong></td>
+            <td style="color:var(--text-muted)"><%= m.title || '—' %></td>
+            <td><span class="badge badge-<%= m.level.toLowerCase() %>"><%= m.level %></span></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+  </div>
+
+  <% } else if (allEvents.length > 0) { %>
+    <div class="panel">
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <p>Select an event above to view its registered members.</p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="panel">
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <p>No events have been created yet.</p>
+      </div>
+    </div>
+  <% } %>
+
+</main>
+
+<script>
+function navigateToEvent(sel) {
+  const id = sel.value;
+  if (id) window.location.href = '/events/' + id + '/members';
+}
+</script>
+
+</body>
+</html>

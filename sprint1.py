@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-import creds
+import creds 
 from mysql.connector import Error
 import mysql.connector
 
@@ -30,10 +30,22 @@ myCreds = creds.Creds()
 connection = create_connection(myCreds.conString, myCreds.userName, myCreds.password, myCreds.dbName)
 
 
+def get_connection():
+    global connection
+    if connection is None:
+        connection = create_connection(myCreds.conString, myCreds.userName, myCreds.password, myCreds.dbName)
+    else:
+        try:
+            if not connection.is_connected():
+                connection.ping(reconnect=True, attempts=3, delay=2)
+        except Exception:
+            connection = create_connection(myCreds.conString, myCreds.userName, myCreds.password, myCreds.dbName)
+    return connection
+
 LEVELS = ['Bronze', 'Silver', 'Gold']
 LEVEL_RANK = {'Bronze': 1, 'Silver': 2, 'Gold': 3}
 
-#Helper Section
+#HELPER SECTION 
 
 def error(msg, code=400):
     return jsonify({'error': msg}), code
@@ -42,7 +54,7 @@ def error(msg, code=400):
 @app.route('/members', methods=['GET'])
 def get_members():
     """Return all members."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM member")
     members = cur.fetchall()
     cur.close()
@@ -54,7 +66,7 @@ def get_members():
 @app.route('/members/<int:member_id>', methods=['GET'])
 def get_member(member_id):
     """Return a single member by ID."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM member WHERE id = %s", (member_id,))
     member = cur.fetchone()
     cur.close()
@@ -65,6 +77,8 @@ def get_member(member_id):
 
 
 #Showcases creating a member with validation and error handling for bad input
+#Referenced AI with prompt: "how to create a API member with validation and error handling for bad input."
+#Remember /members with http
 @app.route('/members', methods=['POST'])
 def create_member():
     """Create a new member.
@@ -95,21 +109,23 @@ def create_member():
     title   = data.get('title', '')
 
 
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute(
         "INSERT INTO member (name, details, title, level) VALUES (%s, %s, %s, %s)",
         (name, details, title, level)
     )
-    mysql.connection.commit()
+    connection.commit()
     new_id = cur.lastrowid
     cur.close()
     return jsonify({'message': 'Member created', 'id': new_id}), 201
 
 #Showcases updating an existing member with full or partial update 
+#Ensures members can only be updated if they exist and validates input with error handling for bad input
+#Use /members/(put number here) to test updating a member by ID with full or partial update of the member's details.
 @app.route('/members/<int:member_id>', methods=['PUT'])
 def update_member(member_id):
     """Update an existing member (full or partial update)."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM member WHERE id = %s", (member_id,))
     member = cur.fetchone()
     if not member:
@@ -141,7 +157,7 @@ def update_member(member_id):
         "UPDATE member SET name=%s, details=%s, title=%s, level=%s WHERE id=%s",
         (name, details, title, level, member_id)
     )
-    mysql.connection.commit()
+    connection.commit()
     cur.close()
     return jsonify({'message': 'Member updated'}), 200
 
@@ -150,7 +166,7 @@ def update_member(member_id):
 @app.route('/members/<int:member_id>', methods=['DELETE'])
 def delete_member(member_id):
     """Delete a member (cascades to registrations)."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT id FROM member WHERE id = %s", (member_id,))
     if not cur.fetchone():
         cur.close()
@@ -158,9 +174,10 @@ def delete_member(member_id):
 
 
     cur.execute("DELETE FROM member WHERE id = %s", (member_id,))
-    mysql.connection.commit()
+    connection.commit()
     cur.close()
     return jsonify({'message': 'Member deleted'}), 200
+
 
 #EVENT ENDPOINTS SECTION 
 
@@ -168,7 +185,7 @@ def delete_member(member_id):
 @app.route('/events', methods=['GET'])
 def get_events():
     """Return all events."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM event")
     events = cur.fetchall()
     cur.close()
@@ -177,10 +194,11 @@ def get_events():
 
 
 #Showcases returning a single event by ID with error handling for not found
+#Referenced AI with prompt: "how to return a single event by ID in an API with SQL database"
 @app.route('/events/<int:event_id>', methods=['GET'])
 def get_event(event_id):
     """Return a single event by ID."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM event WHERE id = %s", (event_id,))
     event = cur.fetchone()
     cur.close()
@@ -223,10 +241,11 @@ def create_event():
         return error('date is required (YYYY-MM-DD)')
 
 
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
 
 
-    # Business rule: no two events on the same date 
+    #Business rule: no two events on the same date 
+    #Referenced AI with prompt: "how to ensure unique date for events when creating an event in an API with SQL database"
     cur.execute("SELECT id FROM event WHERE date = %s", (date,))
     if cur.fetchone():
         cur.close()
@@ -237,7 +256,7 @@ def create_event():
         "INSERT INTO event (name, capacity, level, date) VALUES (%s, %s, %s, %s)",
         (name, int(capacity), level, date)
     )
-    mysql.connection.commit()
+    connection.commit()
     new_id = cur.lastrowid
     cur.close()
     return jsonify({'message': 'Event created', 'id': new_id}), 201
@@ -248,7 +267,7 @@ def create_event():
 @app.route('/events/<int:event_id>', methods=['PUT'])
 def update_event(event_id):
     """Update an existing event (full or partial update)."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM event WHERE id = %s", (event_id,))
     event = cur.fetchone()
     if not event:
@@ -279,7 +298,7 @@ def update_event(event_id):
         return error(f'level must be one of {LEVELS}')
 
 
-    # Business rule: unique date (exclude current event)
+    #Business rule: unique date (exclude current event)
     cur.execute("SELECT id FROM event WHERE date = %s AND id != %s", (date, event_id))
     if cur.fetchone():
         cur.close()
@@ -290,7 +309,7 @@ def update_event(event_id):
         "UPDATE event SET name=%s, capacity=%s, level=%s, date=%s WHERE id=%s",
         (name, int(capacity), level, date, event_id)
     )
-    mysql.connection.commit()
+    connection.commit()
     cur.close()
     return jsonify({'message': 'Event updated'}), 200
 
@@ -300,7 +319,7 @@ def update_event(event_id):
 @app.route('/events/<int:event_id>', methods=['DELETE'])
 def delete_event(event_id):
     """Delete an event (cascades to registrations)."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT id FROM event WHERE id = %s", (event_id,))
     if not cur.fetchone():
         cur.close()
@@ -308,17 +327,19 @@ def delete_event(event_id):
 
 
     cur.execute("DELETE FROM event WHERE id = %s", (event_id,))
-    mysql.connection.commit()
+    connection.commit()
     cur.close()
     return jsonify({'message': 'Event deleted'}), 200
 
-#  REGISTRATION ENDPOINTS SECTION
+
+#REGISTRATION ENDPOINTS SECTION
 
 #Showcases getting all registrations with joined member and event names for easier frontend display
+#Referenced AI with prompt: "how to return all registrations with joined member and event names in an API with SQL database"
 @app.route('/registrations', methods=['GET'])
 def get_registrations():
     """Return all registrations (with joined member & event names)."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("""
         SELECT r.id, r.event_id, r.member_id,
                e.name AS event_name, m.name AS member_name
@@ -333,10 +354,9 @@ def get_registrations():
 
 
 #Showcases returning a single registration by ID with joined member and event names and error handling for not found
-@app.route('/registrations/<int:reg_id>', methods=['GET'])
 def get_registration(reg_id):
     """Return a single registration by ID."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("""
         SELECT r.id, r.event_id, r.member_id,
                e.name AS event_name, m.name AS member_name
@@ -354,10 +374,11 @@ def get_registration(reg_id):
 
 
 #Showcases returning all members registered for a specific event with error handling for event not found
+#Use the /events/<int:event_id>/members endpoint to get all members registered for a specific event by the event ID
 @app.route('/events/<int:event_id>/members', methods=['GET'])
 def get_members_for_event(event_id):
     """Return all members registered for a specific event."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT id FROM event WHERE id = %s", (event_id,))
     if not cur.fetchone():
         cur.close()
@@ -406,10 +427,10 @@ def create_registration():
         return error('event_id and member_id are required')
 
 
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
 
 
-    # Fetch event
+    #Select event
     cur.execute("SELECT * FROM event WHERE id = %s", (event_id,))
     event = cur.fetchone()
     if not event:
@@ -417,7 +438,7 @@ def create_registration():
         return error('Event not found', 404)
 
 
-    # Fetch member
+    #Select member
     cur.execute("SELECT * FROM member WHERE id = %s", (member_id,))
     member = cur.fetchone()
     if not member:
@@ -425,7 +446,8 @@ def create_registration():
         return error('Member not found', 404)
 
 
-    # Business rule 1: level check
+    #Business rule 1: level check
+    #Referenced AI with prompt: "how to ensure member level is sufficient for event level when creating a registration in an API with SQL database"
     if LEVEL_RANK[member['level']] < LEVEL_RANK[event['level']]:
         cur.close()
         return error(
@@ -434,7 +456,7 @@ def create_registration():
         ), 403
 
 
-    # Business rule 2: capacity check
+    #Business rule 2: capacity check
     cur.execute(
         "SELECT COUNT(*) AS cnt FROM registration WHERE event_id = %s",
         (event_id,)
@@ -445,7 +467,7 @@ def create_registration():
         return error('Event is at full capacity'), 409
 
 
-    # Business rule 3: duplicate registration
+    #Business rule 3: duplicate registration
     cur.execute(
         "SELECT id FROM registration WHERE event_id = %s AND member_id = %s",
         (event_id, member_id)
@@ -459,7 +481,7 @@ def create_registration():
         "INSERT INTO registration (event_id, member_id) VALUES (%s, %s)",
         (event_id, member_id)
     )
-    mysql.connection.commit()
+    connection.commit()
     new_id = cur.lastrowid
     cur.close()
     return jsonify({'message': 'Registration created', 'id': new_id}), 201
@@ -467,6 +489,8 @@ def create_registration():
 
 
 #Showcases updating a registration to change the event and/or member with validation and error handling for bad input and business rules
+#Shows same business rules as creating a registration plus ensures registration exists and allows partial update (only event or only member)
+#Use /registrations/(put number here) to test 
 @app.route('/registrations/<int:reg_id>', methods=['PUT'])
 def update_registration(reg_id):
     """Update a registration (change event and/or member).
@@ -479,7 +503,7 @@ def update_registration(reg_id):
 
     The same business rules as POST apply.
     """
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT * FROM registration WHERE id = %s", (reg_id,))
     reg = cur.fetchone()
     if not reg:
@@ -497,7 +521,7 @@ def update_registration(reg_id):
     new_member_id = data.get('member_id', reg['member_id'])
 
 
-    # Fetch event
+    #Select event
     cur.execute("SELECT * FROM event WHERE id = %s", (new_event_id,))
     event = cur.fetchone()
     if not event:
@@ -505,7 +529,7 @@ def update_registration(reg_id):
         return error('Event not found', 404)
 
 
-    # Fetch member
+    #Select member
     cur.execute("SELECT * FROM member WHERE id = %s", (new_member_id,))
     member = cur.fetchone()
     if not member:
@@ -513,7 +537,7 @@ def update_registration(reg_id):
         return error('Member not found', 404)
 
 
-    # Level check
+    #Level check for specific event and member (business rule 1)
     if LEVEL_RANK[member['level']] < LEVEL_RANK[event['level']]:
         cur.close()
         return error(
@@ -522,7 +546,7 @@ def update_registration(reg_id):
         ), 403
 
 
-    # Capacity check (exclude current registration's event if same)
+    #Capacity check (exclude current registration's event if same)
     cur.execute(
         "SELECT COUNT(*) AS cnt FROM registration WHERE event_id = %s AND id != %s",
         (new_event_id, reg_id)
@@ -533,7 +557,8 @@ def update_registration(reg_id):
         return error('Event is at full capacity'), 409
 
 
-    # Duplicate check (exclude self)
+    #Duplicate check (exclude self)
+    #Follows the same logic as create registration but excludes the current registration ID to allow updating without changing event/member or changing just one of them
     cur.execute(
         "SELECT id FROM registration WHERE event_id=%s AND member_id=%s AND id != %s",
         (new_event_id, new_member_id, reg_id)
@@ -547,17 +572,18 @@ def update_registration(reg_id):
         "UPDATE registration SET event_id=%s, member_id=%s WHERE id=%s",
         (new_event_id, new_member_id, reg_id)
     )
-    mysql.connection.commit()
+    connection.commit()
     cur.close()
     return jsonify({'message': 'Registration updated'}), 200
 
 
 
 #Showcases deleting a registration with error handling for not found
+#Also use /registrations/(put number here) to test deleting a registration by ID
 @app.route('/registrations/<int:reg_id>', methods=['DELETE'])
 def delete_registration(reg_id):
     """Delete a registration."""
-    cur = mysql.connection.cursor()
+    cur = get_connection().cursor(dictionary=True)
     cur.execute("SELECT id FROM registration WHERE id = %s", (reg_id,))
     if not cur.fetchone():
         cur.close()
@@ -565,6 +591,10 @@ def delete_registration(reg_id):
 
 
     cur.execute("DELETE FROM registration WHERE id = %s", (reg_id,))
-    mysql.connection.commit()
+    connection.commit()
     cur.close()
     return jsonify({'message': 'Registration deleted'}), 200
+
+if __name__ == '__main__':
+    app.run(debug=True)
+

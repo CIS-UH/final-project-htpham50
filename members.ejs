@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Organization — Members</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<%- include('partials/nav', { page: 'members' }) %>
+
+<main>
+  <div class="page-header">
+    <h1>Member <em>Registry</em></h1>
+    <p class="page-subtitle">Manage VIP membership tiers — Bronze, Silver & Gold</p>
+  </div>
+
+  <% if (flash) { %>
+    <div class="flash flash-success">✓ <%= flash %></div>
+  <% } %>
+  <% if (formError) { %>
+    <div class="flash flash-error">⚠ <%= formError %></div>
+  <% } %>
+
+  <div class="two-col">
+
+    <!-- CREATE FORM -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Add New Member</span>
+      </div>
+      <div class="panel-body">
+        <form action="/members/create" method="POST">
+          <div class="form-group">
+            <label for="name">Full Name *</label>
+            <input type="text" id="name" name="name" required placeholder="e.g. Eleanor Voss">
+          </div>
+          <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" placeholder="e.g. Director, Patron">
+          </div>
+          <div class="form-group">
+            <label for="level">Membership Level *</label>
+            <select id="level" name="level" required>
+              <option value="">— Select level —</option>
+              <option value="Bronze">Bronze</option>
+              <option value="Silver">Silver</option>
+              <option value="Gold">Gold</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="details">Details</label>
+            <textarea id="details" name="details" placeholder="Optional notes about this member"></textarea>
+          </div>
+          <button type="submit" class="btn btn-gold" style="width:100%;">+ Add Member</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- MEMBERS TABLE -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">All Members</span>
+        <span style="color:var(--text-muted);font-size:11px;"><%= (members || []).length %> total</span>
+      </div>
+      <% if (!members || members.length === 0) { %>
+        <div class="empty-state">
+          <div class="empty-icon">👤</div>
+          <p>No members yet. Add one to get started.</p>
+        </div>
+      <% } else { %>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Title</th>
+              <th>Level</th>
+              <th>Details</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% members.forEach(function(m) { %>
+            <tr>
+              <td><strong style="color:var(--text)"><%= m.name %></strong></td>
+              <td style="color:var(--text-muted)"><%= m.title || '—' %></td>
+              <td>
+                <span class="badge badge-<%= (m.level || 'Bronze').toLowerCase() %>">
+                  <%= m.level || 'Bronze' %>
+                </span>
+              </td>
+              <td style="color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <%= m.details || '—' %>
+              </td>
+              <td>
+                <div class="action-row">
+                  <button type="button" class="btn btn-edit" onclick='openEditMember(<%- JSON.stringify(m) %>)'>Edit</button>
+                  <form action="/members/delete" method="POST" onsubmit="return confirm('Delete this member? Their registrations will also be removed.');">
+                    <input type="hidden" name="id" value="<%= m.id %>">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+
+  </div>
+</main>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Member</span>
+      <button type="button" class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <form action="/members/update" method="POST">
+      <input type="hidden" id="edit-id" name="id">
+      <div class="form-group">
+        <label for="edit-name">Full Name *</label>
+        <input type="text" id="edit-name" name="name" required>
+      </div>
+      <div class="form-group">
+        <label for="edit-title">Title</label>
+        <input type="text" id="edit-title" name="title">
+      </div>
+      <div class="form-group">
+        <label for="edit-level">Membership Level *</label>
+        <select id="edit-level" name="level" required>
+          <option value="Bronze">Bronze</option>
+          <option value="Silver">Silver</option>
+          <option value="Gold">Gold</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="edit-details">Details</label>
+        <textarea id="edit-details" name="details"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-gold">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const editModal = document.getElementById('editModal');
+  function openEditMember(m) {
+    document.getElementById('edit-id').value = m.id || '';
+    document.getElementById('edit-name').value = m.name || '';
+    document.getElementById('edit-title').value = m.title || '';
+    document.getElementById('edit-level').value = m.level || 'Bronze';
+    document.getElementById('edit-details').value = m.details || '';
+    editModal.classList.add('open');
+  }
+  function closeModal() {
+    editModal.classList.remove('open');
+  }
+  if (editModal) {
+    editModal.addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+  }
+</script>
+
+</body>
+</html>
